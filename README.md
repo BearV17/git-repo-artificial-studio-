@@ -293,4 +293,5 @@ npm run db:types
 Het tweede commando genereert TypeScript-types uit de gekoppelde database. Tot
 die tijd staan de domeintypes handmatig in `src/lib/types.ts`.
 #   p r o j e c t - a r t i f i c i a l  
+ #   p r o j e c t - a r t i f i c i a l  
  
