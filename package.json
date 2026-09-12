@@ -46,5 +46,8 @@
     "supabase": "^2.115.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "optionalDependencies": {
+    "@supabase/cli-windows-x64": "^2.115.0"
   }
 }

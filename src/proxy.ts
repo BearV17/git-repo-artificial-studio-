@@ -53,10 +53,11 @@ export async function proxy(request: NextRequest) {
   });
 
   // Deze aanroep ververst het access token wanneer dat nodig is. Niet
-  // weghalen: zonder deze regel verloopt de sessie stilletjes.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // weghalen: zonder deze regel verloopt de sessie stilletjes. getClaims()
+  // verifieert lokaal (asymmetric signing keys) i.p.v. een netwerkaanroep
+  // per request, wat veel sneller is dan getUser().
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const { pathname, search } = request.nextUrl;
 

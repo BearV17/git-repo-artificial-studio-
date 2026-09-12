@@ -24,7 +24,7 @@ export interface OutboxResult {
 
 interface OutboundMessage {
   id: string;
-  channel: "email" | "slack";
+  channel: "email" | "slack" | "whatsapp";
   target: string;
   subject: string | null;
   body: string;
@@ -52,6 +52,41 @@ async function sendSlack(
 
   if (!response.ok) {
     throw new Error(`Slack gaf ${response.status}: ${await response.text()}`);
+  }
+}
+
+/** WhatsApp via Chatlevel (https://docs.chatlevel.io). */
+async function sendWhatsapp(
+  message: OutboundMessage,
+  deviceId: string,
+): Promise<void> {
+  const apiKey = process.env.CHATLEVEL_API_KEY;
+  if (!apiKey) throw new Error("CHATLEVEL_API_KEY ontbreekt");
+
+  const link = String(message.payload.link ?? "");
+  const url = link && siteUrl() ? `${siteUrl()}${link}` : null;
+  // Chatlevel verwacht alleen cijfers (8-15), zonder + of andere opmaak.
+  const toNumber = message.target.replace(/\D/g, "");
+
+  const response = await fetch(
+    `https://api.chatlevel.io/v1/devices/${deviceId}/messages/text`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        toNumber,
+        message: [message.body, url ? `\nBekijken: ${url}` : ""]
+          .filter(Boolean)
+          .join("\n"),
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Chatlevel gaf ${response.status}: ${await response.text()}`);
   }
 }
 
@@ -106,10 +141,12 @@ export async function processOutbox(): Promise<OutboxResult> {
   const admin = createAdminClient();
   const result: OutboxResult = { verwerkt: 0, verzonden: 0, overgeslagen: 0, mislukt: 0 };
 
-  const [{ data: slackSetting }, { data: emailSetting }] = await Promise.all([
-    admin.from("app_settings").select("value").eq("key", "slack").maybeSingle(),
-    admin.from("app_settings").select("value").eq("key", "email").maybeSingle(),
-  ]);
+  const [{ data: slackSetting }, { data: emailSetting }, { data: whatsappSetting }] =
+    await Promise.all([
+      admin.from("app_settings").select("value").eq("key", "slack").maybeSingle(),
+      admin.from("app_settings").select("value").eq("key", "email").maybeSingle(),
+      admin.from("app_settings").select("value").eq("key", "whatsapp").maybeSingle(),
+    ]);
 
   const slackWebhook = (slackSetting?.value as { webhook_url?: string } | null)
     ?.webhook_url;
@@ -119,6 +156,8 @@ export async function processOutbox(): Promise<OutboxResult> {
   const emailFrom = emailCfg?.from_address
     ? `${emailCfg.from_name ?? "Artificial Studio"} <${emailCfg.from_address}>`
     : null;
+  const whatsappDeviceId = (whatsappSetting?.value as { device_id?: string } | null)
+    ?.device_id;
 
   const { data: messages } = await admin
     .from("outbound_messages")
@@ -134,7 +173,9 @@ export async function processOutbox(): Promise<OutboxResult> {
     // Kanaal niet ingesteld: één keer overslaan in plaats van blijven proberen.
     const misconfigured =
       (message.channel === "slack" && !slackWebhook) ||
-      (message.channel === "email" && (!emailFrom || !process.env.RESEND_API_KEY));
+      (message.channel === "email" && (!emailFrom || !process.env.RESEND_API_KEY)) ||
+      (message.channel === "whatsapp" &&
+        (!whatsappDeviceId || !process.env.CHATLEVEL_API_KEY));
 
     if (misconfigured) {
       await admin
@@ -144,7 +185,9 @@ export async function processOutbox(): Promise<OutboxResult> {
           last_error:
             message.channel === "slack"
               ? "Geen Slack-webhook ingesteld."
-              : "E-mailverzending is niet volledig ingesteld.",
+              : message.channel === "whatsapp"
+                ? "WhatsApp (Chatlevel) is niet volledig ingesteld."
+                : "E-mailverzending is niet volledig ingesteld.",
         })
         .eq("id", message.id);
       result.overgeslagen += 1;
@@ -154,6 +197,8 @@ export async function processOutbox(): Promise<OutboxResult> {
     try {
       if (message.channel === "slack") {
         await sendSlack(message, slackWebhook as string);
+      } else if (message.channel === "whatsapp") {
+        await sendWhatsapp(message, whatsappDeviceId as string);
       } else {
         await sendEmail(message, emailFrom as string);
       }

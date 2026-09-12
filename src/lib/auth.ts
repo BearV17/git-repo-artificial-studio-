@@ -28,16 +28,18 @@ export interface SessionUser {
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifieert het JWT lokaal (asymmetric signing keys), zonder
+  // netwerkaanroep naar Auth — veel sneller dan getUser() bij elke request.
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
 
-  if (!user) return null;
+  if (!claims) return null;
+  const userId = claims.sub;
 
   const { data: profile } = await supabase
     .from("users")
     .select("id, email, full_name, role, avatar_url, is_active")
-    .eq("id", user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   // Geen profiel of gedeactiveerd account: behandelen als niet ingelogd.
@@ -50,7 +52,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     const { data: link } = await supabase
       .from("customer_users")
       .select("company_id, company:companies(id, name)")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     companyId = link?.company_id ?? null;
