@@ -12,6 +12,7 @@ import { Modal, SubmitButton } from "@/components/ui/modal";
 import { INVOICE_STATUS, options } from "@/lib/labels";
 import type { CompanySummary, Invoice } from "@/lib/types";
 import { useActionForm } from "@/lib/use-action-form";
+import { parseAmount } from "@/lib/validation";
 import { formatCurrency, inDaysIso, toDateInput, todayIso } from "@/lib/utils";
 
 /** Standaard btw-tarief; het bedrag blijft handmatig aanpasbaar. */
@@ -53,8 +54,10 @@ export function InvoiceFormModal({
     },
   );
 
-  const exclNumber = Number(excl.replace(",", ".")) || 0;
-  const vatNumber = Number(vat.replace(",", ".")) || 0;
+  // Dezelfde interpretatie als de server, zodat het getoonde totaal klopt bij
+  // "1.500,00" én bij "1500.00".
+  const exclNumber = parseAmount(excl) || 0;
+  const vatNumber = parseAmount(vat) || 0;
 
   const relevantProjects = projects.filter((p) => !companyId || p.company_id === companyId);
 
@@ -73,7 +76,9 @@ export function InvoiceFormModal({
         onClose={() => setOpen(false)}
         title={isEdit ? "Factuur bewerken" : "Nieuwe factuur"}
         description={
-          isEdit ? undefined : "Het factuurnummer wordt automatisch toegekend."
+          isEdit
+            ? undefined
+            : "Het factuurnummer wordt automatisch toegekend. Na het aanmaken open je meteen de factuur om de PDF toe te voegen."
         }
         size="lg"
         footer={
@@ -167,11 +172,12 @@ export function InvoiceFormModal({
                 value={excl}
                 onChange={(event) => {
                   setExcl(event.target.value);
-                  // Btw automatisch meerekenen zolang de gebruiker die niet
-                  // zelf heeft aangepast.
-                  const parsed = Number(event.target.value.replace(",", "."));
+                  // Btw automatisch meerekenen. Met een komma als decimaalteken,
+                  // zoals de rest van het formulier: "315.00" las eerder als
+                  // een duizendtal en werd zo € 31.500.
+                  const parsed = parseAmount(event.target.value);
                   if (Number.isFinite(parsed)) {
-                    setVat((parsed * VAT_RATE).toFixed(2));
+                    setVat((parsed * VAT_RATE).toFixed(2).replace(".", ","));
                   }
                 }}
                 placeholder="1500,00"

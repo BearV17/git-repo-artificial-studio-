@@ -35,6 +35,7 @@ export interface DocumentRow {
   external_url: string | null;
   visible_to_client: boolean;
   created_at: string;
+  uploaded_by: string | null;
   uploaderName: string | null;
   projectName?: string | null;
   companyName?: string | null;
@@ -56,6 +57,8 @@ function iconFor(row: DocumentRow): LucideIcon {
 export function DocumentList({
   documents,
   canDelete = false,
+  currentUserId,
+  newSince,
   showProject = false,
   showVisibility = true,
   emptyTitle = "Nog geen documenten",
@@ -63,6 +66,13 @@ export function DocumentList({
 }: {
   documents: DocumentRow[];
   canDelete?: boolean;
+  /**
+   * Wie zelf een bestand heeft aangeleverd, mag het ook weer weghalen — dat is
+   * precies wat de databasepolicy toestaat, dus de knop hoort er te staan.
+   */
+  currentUserId?: string;
+  /** Alles wat na dit tijdstip is toegevoegd krijgt het label "Nieuw". */
+  newSince?: string;
   showProject?: boolean;
   showVisibility?: boolean;
   emptyTitle?: string;
@@ -80,7 +90,12 @@ export function DocumentList({
       toast.error(result.error ?? "De download kon niet worden gestart.");
       return;
     }
-    window.open(result.url, "_blank", "noopener,noreferrer");
+    // De link komt pas na een server-actie binnen, dus lang na de klik. Veel
+    // browsers zien `window.open` dan als een ongevraagde pop-up en blokkeren
+    // hem zonder melding — het document leek daardoor niet te openen. Lukt het
+    // niet, dan navigeert hetzelfde tabblad ernaartoe.
+    const opened = window.open(result.url, "_blank", "noopener,noreferrer");
+    if (!opened || opened.closed) window.location.assign(result.url);
   }
 
   if (documents.length === 0) {
@@ -97,6 +112,9 @@ export function DocumentList({
     <ul className="divide-y divide-border">
       {documents.map((doc) => {
         const Icon = iconFor(doc);
+        const mayDelete =
+          canDelete || (currentUserId != null && doc.uploaded_by === currentUserId);
+        const isNew = newSince != null && doc.created_at > newSince;
         const meta = [
           DOCUMENT_CATEGORY[doc.category].label,
           showProject ? (doc.projectName ?? doc.companyName ?? null) : null,
@@ -111,7 +129,10 @@ export function DocumentList({
             </span>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium text-foreground">{doc.name}</p>
+              <p className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+                <span className="truncate">{doc.name}</span>
+                {isNew ? <Badge tone="accent">Nieuw</Badge> : null}
+              </p>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
                 {meta.join(" · ")}
               </p>
@@ -150,7 +171,7 @@ export function DocumentList({
               )}
             </Button>
 
-            {canDelete ? (
+            {mayDelete ? (
               <form
                 action={(formData) => {
                   if (!window.confirm(`"${doc.name}" definitief verwijderen?`)) return;

@@ -1,11 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireInternal } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateShared } from "@/lib/revalidate";
 import { firstIssue, optionalText, optionalUuid, text } from "@/lib/validation";
 
 export interface FeedbackState {
@@ -75,9 +75,9 @@ export async function createFeedbackAction(
 
   if (error) return { error: "De feedback kon niet worden opgeslagen." };
 
-  revalidatePath("/feedback");
-  revalidatePath(`/projecten/${parsed.data.project_id}`);
-  revalidatePath("/dashboard");
+  revalidateShared("/feedback");
+  revalidateShared(`/projecten/${parsed.data.project_id}`);
+  revalidateShared("/dashboard");
   return { success: "Feedback toegevoegd.", id: data.id };
 }
 
@@ -115,9 +115,9 @@ export async function updateFeedbackAction(
 
   if (error) return { error: "De wijzigingen konden niet worden opgeslagen." };
 
-  revalidatePath("/feedback");
-  revalidatePath(`/feedback/${id}`);
-  revalidatePath(`/projecten/${parsed.data.project_id}`);
+  revalidateShared("/feedback");
+  revalidateShared(`/feedback/${id}`);
+  revalidateShared(`/projecten/${parsed.data.project_id}`);
   return { success: "Feedback bijgewerkt.", id };
 }
 
@@ -141,10 +141,10 @@ export async function setFeedbackStatusAction(feedbackId: string, status: string
     return { error: "Je hebt geen rechten om deze feedback te wijzigen." };
   }
 
-  revalidatePath("/feedback");
-  revalidatePath(`/feedback/${feedbackId}`);
-  revalidatePath(`/projecten/${data.project_id}`);
-  revalidatePath("/dashboard");
+  revalidateShared("/feedback");
+  revalidateShared(`/feedback/${feedbackId}`);
+  revalidateShared(`/projecten/${data.project_id}`);
+  revalidateShared("/dashboard");
   return { success: "Status bijgewerkt." };
 }
 
@@ -177,8 +177,8 @@ export async function convertFeedbackToTaskAction(
     return { error: "De taak kon niet worden aangemaakt. Controleer je rechten." };
   }
 
-  revalidatePath("/feedback");
-  revalidatePath(`/feedback/${feedbackId}`);
+  revalidateShared("/feedback");
+  revalidateShared(`/feedback/${feedbackId}`);
   return { success: "Feedback omgezet naar een taak.", id: data as string };
 }
 
@@ -192,8 +192,8 @@ export async function deleteFeedbackAction(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("feedback").delete().eq("id", id);
 
-  revalidatePath("/feedback");
-  if (projectId) revalidatePath(`/projecten/${projectId}`);
+  revalidateShared("/feedback");
+  if (projectId) revalidateShared(`/projecten/${projectId}`);
   // De detailpagina bestaat nu niet meer; terug naar het overzicht.
   redirect("/feedback");
 }

@@ -56,14 +56,18 @@ export function QuestionModal({
         <form id="portal-question" action={submit} className="space-y-4">
           <FormError>{error}</FormError>
 
-          <Field label="Project" htmlFor="pq_project" required>
+          {/* Geen project? Dan kan de vraag alsnog verstuurd worden (§27). */}
+          <Field
+            label="Project"
+            htmlFor="pq_project"
+            hint="Gaat uw vraag niet over een specifiek project? Laat dit leeg."
+          >
             <Select
               id="pq_project"
               name="project_id"
-              required
               defaultValue={defaultProjectId ?? (projects.length === 1 ? projects[0].id : "")}
             >
-              <option value="">Kies een project…</option>
+              <option value="">Algemene vraag</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}

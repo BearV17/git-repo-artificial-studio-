@@ -15,15 +15,21 @@ export const metadata: Metadata = { title: "Vragen" };
 
 /** Vragenoverzicht in het klantportaal (§27). */
 export default async function PortalQuestionsPage() {
-  await requireClient();
+  const user = await requireClient();
   const supabase = await createClient();
 
   const [{ data: items }, { data: projects }] = await Promise.all([
     supabase
       .from("customer_questions")
       .select("id, subject, status, created_at, project:projects(name)")
+      .eq("company_id", user.companyId)
       .order("created_at", { ascending: false }),
-    supabase.from("projects").select("id, name").eq("is_archived", false).order("name"),
+    supabase
+      .from("projects")
+      .select("id, name")
+      .eq("company_id", user.companyId)
+      .eq("is_archived", false)
+      .order("name"),
   ]);
 
   return (

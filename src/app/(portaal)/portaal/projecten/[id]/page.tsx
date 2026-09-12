@@ -1,4 +1,6 @@
+import { Clock, UserRoundCheck } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ProjectTimeline } from "@/components/domain/project-timeline";
@@ -6,10 +8,10 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DefinitionList, EmptyState, PageHeader, Progress } from "@/components/ui/misc";
 import { requireClient } from "@/lib/auth";
-import { PROJECT_STATUS } from "@/lib/labels";
+import { PROJECT_STATUS, WAITING_ON_CLIENT_STATUSES } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/server";
 import type { ProjectPhase, ProjectStatus } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate, isOverdue } from "@/lib/utils";
 
 export async function generateMetadata({
   params,
@@ -28,7 +30,7 @@ export default async function PortalProjectPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireClient();
+  const user = await requireClient();
   const { id } = await params;
   const supabase = await createClient();
 
@@ -38,19 +40,36 @@ export default async function PortalProjectPage({
       "id, name, description, status, progress, start_date, deadline, next_step, project_manager:users!projects_project_manager_id_fkey(full_name, email)",
     )
     .eq("id", id)
+    .eq("company_id", user.companyId)
     .maybeSingle();
 
   if (!project) notFound();
 
-  const [{ data: phases }, { data: updates }] = await Promise.all([
+  const [{ data: phases }, { data: updates }, { data: openActions }] = await Promise.all([
     supabase.from("project_phases").select("*").eq("project_id", id).order("position"),
     supabase
       .from("project_updates")
       .select("id, title, body, published_at")
       .eq("project_id", id)
+      .eq("company_id", user.companyId)
+      .eq("visible_to_client", true)
       .order("published_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("customer_actions")
+      .select("id, title, due_date")
+      .eq("project_id", id)
+      .eq("company_id", user.companyId)
+      .not("status", "in", "(done,cancelled)")
+      .order("due_date", { ascending: true, nullsFirst: false }),
   ]);
+
+  // Bij "Wachten op u" hoort te staan waaróp wij wachten (§28). Zonder dat
+  // bleef de status een mededeling zonder handelingsperspectief.
+  const waitingOnClient = WAITING_ON_CLIENT_STATUSES.includes(
+    project.status as ProjectStatus,
+  );
+  const actions = openActions ?? [];
 
   const manager = Array.isArray(project.project_manager)
     ? project.project_manager[0]
@@ -72,6 +91,58 @@ export default async function PortalProjectPage({
           />
         }
       />
+
+      {waitingOnClient ? (
+        <Card className="border-warning/40">
+          <CardHeader
+            title={
+              project.status === "client_test"
+                ? "Klaar om te testen"
+                : "Wij wachten op u"
+            }
+            description={
+              actions.length > 0
+                ? "Zodra het onderstaande bij ons binnen is, gaan wij verder."
+                : "Er staat geen concrete actie open. Laat via een vraag of feedback weten hoe u ervoor staat."
+            }
+          />
+          {actions.length > 0 ? (
+            <ul className="divide-y divide-border">
+              {actions.map((action) => (
+                <li key={action.id} className="px-5 py-3.5">
+                  <Link
+                    href={`/portaal/acties/${action.id}`}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] hover:text-accent"
+                  >
+                    <UserRoundCheck className="h-4 w-4 shrink-0 text-warning" />
+                    <span className="min-w-0 flex-1 font-medium">{action.title}</span>
+                    {action.due_date ? (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 text-xs text-muted-foreground",
+                          isOverdue(action.due_date) && "font-medium text-danger",
+                        )}
+                      >
+                        <Clock className="h-3 w-3" />
+                        {formatDate(action.due_date)}
+                      </span>
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <CardBody className="pt-0">
+              <Link
+                href="/portaal/vragen"
+                className="text-[13px] text-accent hover:underline"
+              >
+                Een vraag stellen
+              </Link>
+            </CardBody>
+          )}
+        </Card>
+      ) : null}
 
       <Card>
         <CardBody className="space-y-5">

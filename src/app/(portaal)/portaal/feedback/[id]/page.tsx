@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { FeedbackModal } from "../feedback-modal";
+import { withdrawFeedbackAction } from "../../../actions";
 import { CommentThread, type ThreadComment } from "@/components/domain/comment-thread";
 import { DocumentList, type DocumentRow } from "@/components/domain/document-list";
 import { DocumentUploadModal } from "@/components/domain/document-upload-modal";
 import { StatusSteps } from "@/components/domain/status-steps";
 import { StatusBadge } from "@/components/ui/badge";
+import { ConfirmSubmitButton } from "@/components/ui/modal";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DefinitionList, PageHeader } from "@/components/ui/misc";
 import { requireClient } from "@/lib/auth";
@@ -45,11 +48,18 @@ export default async function PortalFeedbackDetailPage({
     .from("feedback")
     .select("*, project:projects(id, name)")
     .eq("id", id)
+    .eq("company_id", user.companyId)
     .maybeSingle();
 
   if (!item) notFound();
 
-  const [{ data: commentRows }, { data: fileRows }] = await Promise.all([
+  // Een punt dat wij nog niet hebben opgepakt, mag de indiener zelf aanpassen
+  // of intrekken (§26).
+  const isOwn = item.submitted_by === user.id;
+  const canEdit = isOwn && item.status === "new";
+
+  const [{ data: commentRows }, { data: fileRows }, { data: projectOptions }] =
+    await Promise.all([
     supabase
       .from("comments")
       .select(
@@ -64,6 +74,12 @@ export default async function PortalFeedbackDetailPage({
       .eq("entity_type", "feedback")
       .eq("entity_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("projects")
+      .select("id, name")
+      .eq("company_id", user.companyId)
+      .eq("is_archived", false)
+      .order("name"),
   ]);
 
   const project = Array.isArray(item.project) ? item.project[0] : item.project;
@@ -95,7 +111,32 @@ export default async function PortalFeedbackDetailPage({
         ]}
         title={item.title}
         description={`Ingediend op ${formatDateTime(item.created_at)}`}
-        action={<StatusBadge map={FEEDBACK_STATUS} value={item.status} />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge map={FEEDBACK_STATUS} value={item.status} />
+            {canEdit ? (
+              <>
+                <FeedbackModal
+                  projects={projectOptions ?? []}
+                  feedback={{
+                    id: item.id,
+                    project_id: item.project_id,
+                    title: item.title,
+                    description: item.description,
+                    type: item.type,
+                    priority: item.priority,
+                  }}
+                />
+                <form action={withdrawFeedbackAction}>
+                  <input type="hidden" name="id" value={item.id} />
+                  <ConfirmSubmitButton message="Dit feedbackpunt intrekken?">
+                    Intrekken
+                  </ConfirmSubmitButton>
+                </form>
+              </>
+            ) : null}
+          </div>
+        }
       />
 
       <Card>
@@ -108,7 +149,14 @@ export default async function PortalFeedbackDetailPage({
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="Uw omschrijving" />
+            <CardHeader
+              title={isOwn ? "Uw omschrijving" : "Omschrijving"}
+              description={
+                isOwn
+                  ? undefined
+                  : "Dit punt is namens uw organisatie door ons genoteerd."
+              }
+            />
             <CardBody>
               <p className="whitespace-pre-wrap text-sm leading-relaxed">
                 {item.description || "Geen verdere toelichting."}
@@ -180,6 +228,7 @@ export default async function PortalFeedbackDetailPage({
             />
             <DocumentList
               documents={documents}
+              currentUserId={user.id}
               showVisibility={false}
               emptyTitle="Geen bijlagen"
               emptyDescription="Voeg een screenshot toe om uw punt te verduidelijken."

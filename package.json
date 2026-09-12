@@ -15,6 +15,7 @@
     "db:types": "supabase gen types typescript --linked > src/lib/database.types.ts",
     "test:rls": "docker exec -i supabase_db_artificial-studio-pm psql -U postgres -d postgres -q -f - < supabase/tests/rls_test.sql",
     "test:outbox": "docker exec -i supabase_db_artificial-studio-pm psql -U postgres -d postgres -q -f - < supabase/tests/outbox_test.sql",
+    "test:bugfix": "docker exec -i supabase_db_artificial-studio-pm psql -U postgres -d postgres -q -f - < supabase/tests/bugfix_test.sql",
     "test:storage": "node supabase/tests/storage_test.mjs",
     "test:delivery": "node supabase/tests/outbox_delivery_test.mjs",
     "test:access": "node supabase/tests/access_test.mjs"

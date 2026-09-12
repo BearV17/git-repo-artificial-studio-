@@ -11,7 +11,7 @@ import { Table, TableWrap, Td, Th, Tr } from "@/components/ui/table";
 import { isManager, requireInternal } from "@/lib/auth";
 import { COMPANY_STATUS, options } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/server";
-import type { CompanyStats, CompanyStatus, UserSummary } from "@/lib/types";
+import type { CompanyStats, CompanyStatus, UserRole, UserSummary } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Klanten" };
 
@@ -61,7 +61,7 @@ export default async function CompaniesPage({
         key={`${params.q ?? ""}|${params.status ?? ""}|${params.manager ?? ""}`}
         fallback={<TableSkeleton cols={7} />}
       >
-        <CompaniesTable params={params} />
+        <CompaniesTable params={params} role={user.role} />
       </Suspense>
     </>
   );
@@ -69,8 +69,10 @@ export default async function CompaniesPage({
 
 async function CompaniesTable({
   params,
+  role,
 }: {
   params: { q?: string; status?: string; manager?: string };
+  role: UserRole;
 }) {
   const supabase = await createClient();
 
@@ -111,11 +113,27 @@ async function CompaniesTable({
   );
 
   if (rows.length === 0) {
+    // Een developer ziet alleen klanten van projecten waaraan hij werkt (§2).
+    const limitedView = role === "developer" || role === "freelancer";
+    const filtered = Boolean(params.q || params.status || params.manager);
+
     return (
       <TableWrap>
         <EmptyState
-          title="Geen klanten gevonden"
-          description="Pas je zoekopdracht aan of voeg een nieuwe klant toe."
+          title={
+            filtered
+              ? "Geen klanten gevonden"
+              : limitedView
+                ? "Nog geen klanten zichtbaar"
+                : "Nog geen klanten"
+          }
+          description={
+            filtered
+              ? "Pas je zoekopdracht aan of voeg een nieuwe klant toe."
+              : limitedView
+                ? "Je ziet hier de klanten van de projecten waaraan je meewerkt. Zodra je aan een project wordt gekoppeld, verschijnt de klant vanzelf."
+                : "Voeg je eerste klant toe om te beginnen."
+          }
           icon={<Building2 className="h-5 w-5" />}
         />
       </TableWrap>

@@ -14,12 +14,15 @@ import { formatDate } from "@/lib/utils";
 export const metadata: Metadata = { title: "Projecten" };
 
 export default async function PortalProjectsPage() {
-  await requireClient();
+  const user = await requireClient();
   const supabase = await createClient();
 
   const { data: projects } = await supabase
     .from("projects")
     .select("id, name, status, progress, start_date, deadline, next_step")
+    // RLS filtert dit ook af, maar de query hoort niet van één laag afhankelijk
+    // te zijn: één ontbrekende policy mag nooit andermans projecten tonen.
+    .eq("company_id", user.companyId)
     .order("deadline", { ascending: true, nullsFirst: false });
 
   const all = projects ?? [];

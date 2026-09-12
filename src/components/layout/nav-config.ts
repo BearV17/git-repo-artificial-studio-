@@ -41,6 +41,7 @@ export const INTERNAL_NAV: NavItem[] = [
     icon: "Bell",
     badgeKey: "notifications",
   },
+  { href: "/account", label: "Mijn account", icon: "UserRound" },
   { href: "/team", label: "Team", icon: "Users" },
   { href: "/instellingen", label: "Instellingen", icon: "Settings" },
 ];

@@ -1,11 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireInternal } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateShared } from "@/lib/revalidate";
 import { firstIssue, text } from "@/lib/validation";
 
 export interface QuestionState {
@@ -66,8 +66,8 @@ export async function createQuestionAction(
 
   if (error) return { error: "De vraag kon niet worden opgeslagen." };
 
-  revalidatePath("/vragen");
-  revalidatePath(`/projecten/${parsed.data.project_id}`);
+  revalidateShared("/vragen");
+  revalidateShared(`/projecten/${parsed.data.project_id}`);
   return { success: "Vraag vastgelegd.", id: data.id };
 }
 
@@ -101,8 +101,8 @@ export async function updateQuestionAction(
 
   if (error) return { error: "De wijzigingen konden niet worden opgeslagen." };
 
-  revalidatePath("/vragen");
-  revalidatePath(`/vragen/${id}`);
+  revalidateShared("/vragen");
+  revalidateShared(`/vragen/${id}`);
   return { success: "Vraag bijgewerkt.", id };
 }
 
@@ -129,10 +129,10 @@ export async function setQuestionStatusAction(questionId: string, status: string
     return { error: "Je hebt geen rechten om deze vraag te wijzigen." };
   }
 
-  revalidatePath("/vragen");
-  revalidatePath(`/vragen/${questionId}`);
-  if (data.project_id) revalidatePath(`/projecten/${data.project_id}`);
-  revalidatePath("/dashboard");
+  revalidateShared("/vragen");
+  revalidateShared(`/vragen/${questionId}`);
+  if (data.project_id) revalidateShared(`/projecten/${data.project_id}`);
+  revalidateShared("/dashboard");
   return { success: "Status bijgewerkt." };
 }
 
@@ -145,6 +145,6 @@ export async function deleteQuestionAction(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("customer_questions").delete().eq("id", id);
 
-  revalidatePath("/vragen");
+  revalidateShared("/vragen");
   redirect("/vragen");
 }

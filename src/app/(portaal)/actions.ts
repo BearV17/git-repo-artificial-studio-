@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireClient } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { firstIssue, text } from "@/lib/validation";
+import { firstIssue, optionalUuid, text } from "@/lib/validation";
 
 export interface PortalState {
   error?: string;
@@ -83,11 +84,89 @@ export async function submitFeedbackAction(
   return { success: "Bedankt, uw feedback is ontvangen.", id: data.id };
 }
 
+/**
+ * Eigen feedback bijwerken (§26).
+ *
+ * Alleen zolang wij er nog niet mee bezig zijn: daarna hoort het punt bij de
+ * werkvoorraad en zou een wijziging het gesprek eronder onnavolgbaar maken. De
+ * policies `feedback_update_client` en `feedback_delete_client` bewaken dezelfde
+ * grens in de database.
+ */
+export async function updateOwnFeedbackAction(
+  _prev: PortalState,
+  formData: FormData,
+): Promise<PortalState> {
+  const user = await requireClient();
+
+  const id = text(formData.get("id"));
+  if (!id) return { error: "Onbekend feedbackpunt." };
+
+  const parsed = feedbackSchema.safeParse({
+    project_id: text(formData.get("project_id")),
+    title: text(formData.get("title")),
+    description: text(formData.get("description")),
+    type: text(formData.get("type")) || "general",
+    priority: text(formData.get("priority")) || "normal",
+  });
+
+  if (!parsed.success) return { error: firstIssue(parsed.error) };
+
+  if (!(await assertOwnProject(parsed.data.project_id, user.companyId))) {
+    return { error: "Dit project hoort niet bij uw organisatie." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("feedback")
+    .update(parsed.data)
+    .eq("id", id)
+    .eq("submitted_by", user.id)
+    .eq("status", "new")
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { error: "De wijziging kon niet worden opgeslagen." };
+  if (!data) {
+    return {
+      error: "Dit punt is al in behandeling genomen en kan niet meer worden aangepast.",
+    };
+  }
+
+  revalidatePath("/portaal/feedback");
+  revalidatePath(`/portaal/feedback/${id}`);
+  revalidatePath("/feedback");
+  revalidatePath(`/feedback/${id}`);
+  return { success: "Uw feedback is bijgewerkt.", id };
+}
+
+/** Eigen feedback intrekken zolang die nog niet is opgepakt (§26). */
+export async function withdrawFeedbackAction(formData: FormData) {
+  const user = await requireClient();
+
+  const id = text(formData.get("id"));
+  if (!id) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("feedback")
+    .delete()
+    .eq("id", id)
+    .eq("submitted_by", user.id)
+    .eq("status", "new");
+
+  revalidatePath("/portaal/feedback");
+  revalidatePath("/portaal");
+  revalidatePath("/feedback");
+  redirect("/portaal/feedback");
+}
+
 // -----------------------------------------------------------------------------
 // Vraag stellen (§27)
 // -----------------------------------------------------------------------------
+// Het project is bewust optioneel: een klant die nog geen project heeft — of
+// een algemene vraag stelt — moet ons ook kunnen bereiken.
 const questionSchema = z.object({
-  project_id: z.uuid("Kies een project."),
+  project_id: optionalUuid,
   subject: z.string().trim().min(2, "Vul een onderwerp in."),
   body: z.string().trim().min(1, "Stel uw vraag."),
 });
@@ -106,7 +185,10 @@ export async function askQuestionAction(
 
   if (!parsed.success) return { error: firstIssue(parsed.error) };
 
-  if (!(await assertOwnProject(parsed.data.project_id, user.companyId))) {
+  if (
+    parsed.data.project_id &&
+    !(await assertOwnProject(parsed.data.project_id, user.companyId))
+  ) {
     return { error: "Dit project hoort niet bij uw organisatie." };
   }
 

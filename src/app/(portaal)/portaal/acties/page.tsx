@@ -24,12 +24,13 @@ interface ActionRow {
 
 /** "Acties voor u" (§28). */
 export default async function PortalActionsPage() {
-  await requireClient();
+  const user = await requireClient();
   const supabase = await createClient();
 
   const { data: actions } = await supabase
     .from("customer_actions")
     .select("id, title, description, due_date, status, project:projects(name)")
+    .eq("company_id", user.companyId)
     .order("due_date", { ascending: true, nullsFirst: false });
 
   const rows = (actions ?? []) as ActionRow[];

@@ -21,7 +21,7 @@ export const metadata: Metadata = { title: "Facturen" };
  * klanten al uit.
  */
 export default async function PortalInvoicesPage() {
-  await requireClient();
+  const user = await requireClient();
   const supabase = await createClient();
 
   const { data: invoices } = await supabase
@@ -29,6 +29,9 @@ export default async function PortalInvoicesPage() {
     .select(
       "id, invoice_number, invoice_date, due_date, total_amount, status, project:projects(name)",
     )
+    .eq("company_id", user.companyId)
+    // Concepten zijn intern; ze horen nooit in het portaal te verschijnen.
+    .neq("status", "draft")
     .order("invoice_date", { ascending: false });
 
   const rows = invoices ?? [];

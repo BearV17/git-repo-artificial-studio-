@@ -40,34 +40,43 @@ export default async function PortalDashboardPage() {
       .select(
         "id, name, status, progress, start_date, deadline, next_step, project_manager:users!projects_project_manager_id_fkey(full_name)",
       )
+      .eq("company_id", user.companyId)
       .eq("is_archived", false)
       .order("deadline", { ascending: true, nullsFirst: false }),
     supabase
       .from("customer_actions")
       .select("id, title, due_date, status, project:projects(name)")
+      .eq("company_id", user.companyId)
       .not("status", "in", "(done,cancelled)")
       .order("due_date", { ascending: true, nullsFirst: false })
       .limit(5),
     supabase
       .from("project_updates")
       .select("id, title, body, published_at, project:projects(id, name)")
+      .eq("company_id", user.companyId)
+      .eq("visible_to_client", true)
       .order("published_at", { ascending: false })
       .limit(5),
     supabase
       .from("customer_questions")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", user.companyId)
       .not("status", "in", "(answered,closed)"),
     supabase
       .from("feedback")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", user.companyId)
       .not("status", "in", "(resolved,rejected)"),
     supabase
       .from("invoices")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", user.companyId)
       .in("status", ["open", "overdue"]),
     supabase
       .from("project_updates")
       .select("id", { count: "exact", head: true })
+      .eq("company_id", user.companyId)
+      .eq("visible_to_client", true)
       .gte("published_at", sevenDaysAgo),
   ]);
 
@@ -257,18 +266,31 @@ export default async function PortalDashboardPage() {
               const project = Array.isArray(update.project)
                 ? update.project[0]
                 : update.project;
+              // De update hoort bij een project; daar staat de volledige
+              // tijdlijn. Zonder deze link was er niets om op te klikken.
+              const projectRef = project as { id: string; name: string } | null;
+
               return (
-                <li key={update.id} className="px-5 py-4">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="text-[13px] font-medium">{update.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(update.published_at)}
-                      {project ? ` · ${(project as { name: string }).name}` : ""}
+                <li key={update.id}>
+                  <Link
+                    href={
+                      projectRef
+                        ? `/portaal/projecten/${projectRef.id}`
+                        : "/portaal/projecten"
+                    }
+                    className="block px-5 py-4 transition-colors hover:bg-surface-muted/50"
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="text-[13px] font-medium">{update.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(update.published_at)}
+                        {projectRef ? ` · ${projectRef.name}` : ""}
+                      </p>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted-foreground">
+                      {update.body}
                     </p>
-                  </div>
-                  <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted-foreground">
-                    {update.body}
-                  </p>
+                  </Link>
                 </li>
               );
             })}

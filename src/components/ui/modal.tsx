@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, type ReactNode } from "react";
 import { createPortal, useFormStatus } from "react-dom";
 
 import { Button, buttonClass } from "./button";
@@ -33,13 +33,19 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // De aanroeper geeft vrijwel altijd een inline functie mee, die bij elke
+  // render een nieuwe identiteit krijgt. Stond `onClose` in de dependencies van
+  // het effect hieronder, dan draaide dat bij élke toetsaanslag opnieuw en
+  // sprong de focus terug naar de sluitknop — precies de bug uit de test.
+  const requestClose = useEffectEvent(() => onClose());
+
   useEffect(() => {
     if (!open) return;
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        requestClose();
       }
     }
 
@@ -60,7 +66,8 @@ export function Modal({
       document.body.style.overflow = previousOverflow;
       window.clearTimeout(timer);
     };
-  }, [open, onClose]);
+    // Bewust alleen `open`: het effect hoort één keer per opening te draaien.
+  }, [open]);
 
   // `document` bestaat niet tijdens server-rendering. Omdat `open` bij de
   // eerste render altijd false is, ontstaat er geen hydration-verschil.

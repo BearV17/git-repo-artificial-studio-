@@ -310,6 +310,7 @@ export default async function ProjectDetailPage({
       {tab === "acties" ? (
         <CustomerActionsTab
           projectId={id}
+          companyName={company?.name ?? "de klant"}
           contacts={contactList}
           canManage={canManage}
         />
@@ -775,10 +776,12 @@ async function ProjectQuestionsTab({ projectId }: { projectId: string }) {
 // -----------------------------------------------------------------------------
 async function CustomerActionsTab({
   projectId,
+  companyName,
   contacts,
   canManage,
 }: {
   projectId: string;
+  companyName: string;
   contacts: { id: string; full_name: string; email: string | null }[];
   canManage: boolean;
 }) {
@@ -795,10 +798,14 @@ async function CustomerActionsTab({
     <Card>
       <CardHeader
         title="Acties voor de klant"
-        description="Deze acties staan bij de klant in het portaal onder 'Acties voor u'."
+        description={`Deze acties staan bij ${companyName} in het portaal onder 'Acties voor u'.`}
         action={
           canManage ? (
-            <CustomerActionModal projectId={projectId} contacts={contacts} />
+            <CustomerActionModal
+              projectId={projectId}
+              companyName={companyName}
+              contacts={contacts}
+            />
           ) : null
         }
       />

@@ -28,6 +28,7 @@ export default async function InternalLayout({ children }: { children: ReactNode
         role: user.role,
         avatarUrl: user.avatarUrl,
       }}
+      accountHref="/account"
       unreadNotifications={unread ?? 0}
       theme={theme}
       signOut={signOutAction}

@@ -17,6 +17,27 @@ import { text } from "@/lib/validation";
 function revalidateBoth() {
   revalidatePath("/notificaties");
   revalidatePath("/portaal/notificaties");
+  // De teller in de zijbalk hangt aan de layout van beide omgevingen.
+  revalidatePath("/dashboard");
+  revalidatePath("/portaal");
+}
+
+/**
+ * Markeert één melding als gelezen. Wordt aangeroepen zodra iemand de melding
+ * aanklikt; zonder dit bleef de teller op hetzelfde getal staan.
+ */
+export async function markNotificationReadById(id: string) {
+  const user = await requireUser();
+  if (!id) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("notifications")
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  revalidateBoth();
 }
 
 export async function markNotificationReadAction(formData: FormData) {

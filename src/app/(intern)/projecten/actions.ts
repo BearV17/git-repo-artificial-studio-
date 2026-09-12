@@ -1,10 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireInternal, requireManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateShared } from "@/lib/revalidate";
 import {
   checkbox,
   firstIssue,
@@ -135,8 +135,8 @@ export async function createProjectAction(
     }
   }
 
-  revalidatePath("/projecten");
-  revalidatePath("/dashboard");
+  revalidateShared("/projecten");
+  revalidateShared("/dashboard");
   return { success: "Project aangemaakt.", id: project.id };
 }
 
@@ -172,8 +172,8 @@ export async function updateProjectAction(
     return { error: "De wijzigingen konden niet worden opgeslagen." };
   }
 
-  revalidatePath("/projecten");
-  revalidatePath(`/projecten/${id}`);
+  revalidateShared("/projecten");
+  revalidateShared(`/projecten/${id}`);
   return { success: "Project bijgewerkt.", id };
 }
 
@@ -201,9 +201,9 @@ export async function moveProjectAction(projectId: string, status: string) {
     return { error: "Je hebt geen rechten om dit project te verplaatsen." };
   }
 
-  revalidatePath("/projecten");
-  revalidatePath(`/projecten/${projectId}`);
-  revalidatePath("/dashboard");
+  revalidateShared("/projecten");
+  revalidateShared(`/projecten/${projectId}`);
+  revalidateShared("/dashboard");
   return { success: "Projectfase bijgewerkt." };
 }
 
@@ -245,5 +245,5 @@ export async function updateProjectMembersAction(formData: FormData) {
       .in("user_id", toRemove);
   }
 
-  revalidatePath(`/projecten/${projectId}`);
+  revalidateShared(`/projecten/${projectId}`);
 }

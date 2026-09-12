@@ -14,6 +14,7 @@ import { PRIORITY, PROJECT_STATUS, PROJECT_TYPE, options } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/server";
 import type {
   CompanySummary,
+  UserRole,
   ProjectStats,
   ProjectType,
   UserSummary,
@@ -114,7 +115,7 @@ export default async function ProjectsPage({
         key={JSON.stringify(params)}
         fallback={<TableSkeleton cols={7} rows={8} />}
       >
-        <ProjectsView params={params} view={view} canMove />
+        <ProjectsView params={params} view={view} role={user.role} canMove />
       </Suspense>
     </>
   );
@@ -168,10 +169,12 @@ function ViewSwitch({ view, params }: { view: string; params: ProjectFilters }) 
 async function ProjectsView({
   params,
   view,
+  role,
   canMove,
 }: {
   params: ProjectFilters;
   view: string;
+  role: UserRole;
   canMove: boolean;
 }) {
   const supabase = await createClient();
@@ -253,11 +256,31 @@ async function ProjectsView({
   });
 
   if (projects.length === 0) {
+    // Developers en freelancers zien alleen projecten waaraan ze gekoppeld zijn
+    // (§2). Een lege lijst betekende voor hen "er is niets", terwijl er wel
+    // degelijk projecten zijn — vandaar een aparte uitleg.
+    const limitedView = role === "developer" || role === "freelancer";
+    const filtered = Object.entries(params).some(
+      ([key, value]) => key !== "weergave" && value,
+    );
+
     return (
       <TableWrap>
         <EmptyState
-          title="Geen projecten gevonden"
-          description="Pas je filters aan of maak een nieuw project aan."
+          title={
+            filtered
+              ? "Geen projecten gevonden"
+              : limitedView
+                ? "Je bent nog niet aan een project gekoppeld"
+                : "Nog geen projecten"
+          }
+          description={
+            filtered
+              ? "Pas je filters aan of maak een nieuw project aan."
+              : limitedView
+                ? "Je ziet hier de projecten waaraan je als teamlid bent toegevoegd. Vraag je projectmanager om je te koppelen."
+                : "Maak een nieuw project aan om te beginnen."
+          }
           icon={<FolderKanban className="h-5 w-5" />}
         />
       </TableWrap>

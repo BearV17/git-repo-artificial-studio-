@@ -33,6 +33,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
         avatarUrl: user.avatarUrl,
         subtitle: user.companyName ?? undefined,
       }}
+      accountHref="/portaal/account"
       unreadNotifications={unread ?? 0}
       theme={theme}
       signOut={signOutAction}

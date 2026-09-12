@@ -15,17 +15,21 @@ export const metadata: Metadata = { title: "Feedback" };
 
 /** Feedbackoverzicht in het klantportaal (§26). */
 export default async function PortalFeedbackPage() {
-  await requireClient();
+  const user = await requireClient();
   const supabase = await createClient();
 
   const [{ data: items }, { data: projects }] = await Promise.all([
     supabase
       .from("feedback")
-      .select("id, title, type, status, created_at, project:projects(name)")
+      .select(
+        "id, title, type, status, created_at, submitted_by, project:projects(name), submitter:users!feedback_submitted_by_fkey(full_name)",
+      )
+      .eq("company_id", user.companyId)
       .order("created_at", { ascending: false }),
     supabase
       .from("projects")
       .select("id, name")
+      .eq("company_id", user.companyId)
       .eq("is_archived", false)
       .order("name"),
   ]);
@@ -41,7 +45,7 @@ export default async function PortalFeedbackPage() {
     <>
       <PageHeader
         title="Feedback"
-        description="Alles wat u aan ons heeft doorgegeven, met de status erbij."
+        description="Alle feedbackpunten over uw projecten, met de status erbij. Ook wat wij namens u noteren staat ertussen."
         action={<FeedbackModal projects={projects ?? []} />}
       />
 
@@ -76,6 +80,7 @@ function FeedbackRows({
     status: string;
     created_at: string;
     project?: { name: string } | { name: string }[] | null;
+    submitter?: { full_name: string } | { full_name: string }[] | null;
   }[];
   emptyTitle: string;
   emptyDescription?: string;
@@ -94,6 +99,7 @@ function FeedbackRows({
     <ul className="divide-y divide-border">
       {items.map((item) => {
         const project = Array.isArray(item.project) ? item.project[0] : item.project;
+        const submitter = Array.isArray(item.submitter) ? item.submitter[0] : item.submitter;
         return (
           <li key={item.id}>
             <Link
@@ -104,6 +110,7 @@ function FeedbackRows({
                 <p className="truncate text-sm font-medium">{item.title}</p>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
                   {project?.name ?? "—"} · {formatDate(item.created_at)}
+                  {submitter?.full_name ? ` · door ${submitter.full_name}` : ""}
                 </p>
               </div>
               <StatusBadge

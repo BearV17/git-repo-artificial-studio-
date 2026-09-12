@@ -64,6 +64,7 @@ export function AppShell({
   nav,
   user,
   children,
+  accountHref,
   signOut,
   unreadNotifications = 0,
   theme = "systeem",
@@ -71,6 +72,8 @@ export function AppShell({
   nav: NavItem[];
   user: ShellUser;
   children: ReactNode;
+  /** Pad naar de eigen accountpagina; verschilt per omgeving. */
+  accountHref: string;
   signOut: () => Promise<void>;
   /** Startwaarde voor de notificatieteller; die werkt zichzelf daarna bij. */
   unreadNotifications?: number;
@@ -99,7 +102,9 @@ export function AppShell({
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-border bg-surface",
-          "transition-transform lg:translate-x-0 lg:static lg:z-auto",
+          // `sticky` in plaats van `static`: op desktop neemt de balk ruimte in
+          // de flexrij in, maar blijft hij staan als de pagina scrollt.
+          "transition-transform lg:translate-x-0 lg:sticky lg:top-0 lg:bottom-auto lg:h-svh lg:z-auto",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -151,15 +156,22 @@ export function AppShell({
           <ThemeToggle initial={theme} />
 
           <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-            <Avatar name={user.fullName} src={user.avatarUrl} size="md" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium leading-tight">
-                {user.fullName}
-              </p>
-              <p className="truncate text-[11px] leading-tight text-muted-foreground">
-                {user.subtitle ?? USER_ROLE[user.role].label}
-              </p>
-            </div>
+            <Link
+              href={accountHref}
+              onClick={() => setMobileOpen(false)}
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md transition-colors hover:text-accent"
+              title="Mijn account"
+            >
+              <Avatar name={user.fullName} src={user.avatarUrl} size="md" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium leading-tight">
+                  {user.fullName}
+                </span>
+                <span className="block truncate text-[11px] leading-tight text-muted-foreground">
+                  {user.subtitle ?? USER_ROLE[user.role].label}
+                </span>
+              </span>
+            </Link>
             <form action={signOut}>
               <button
                 type="submit"

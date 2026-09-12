@@ -26,9 +26,15 @@ const SUGGESTIONS = [
  */
 export function CustomerActionModal({
   projectId,
+  companyName,
   contacts,
 }: {
   projectId: string;
+  /**
+   * De klant volgt uit het project en is dus niet te kiezen. Wel benoemen we
+   * hem expliciet: tijdens de test was niet duidelijk waar de actie belandde.
+   */
+  companyName: string;
   contacts: { id: string; full_name: string; email: string | null }[];
 }) {
   const router = useRouter();
@@ -54,8 +60,8 @@ export function CustomerActionModal({
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Actie voor de klant"
-        description="De klant ziet deze actie prominent in het portaal en kan hem afvinken."
+        title={`Actie voor ${companyName}`}
+        description={`${companyName} ziet deze actie prominent in het portaal en kan hem afvinken.`}
         size="lg"
         footer={
           <>
@@ -109,7 +115,11 @@ export function CustomerActionModal({
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Contactpersoon" htmlFor="action_contact">
+            <Field
+              label="Contactpersoon"
+              htmlFor="action_contact"
+              hint={`Contactpersonen van ${companyName}.`}
+            >
               <Select id="action_contact" name="assigned_contact_id" defaultValue="">
                 <option value="">Hele organisatie</option>
                 {contacts.map((contact) => (

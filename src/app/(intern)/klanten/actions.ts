@@ -153,6 +153,8 @@ export async function createContactAction(
 
   if (error) return { error: "De contactpersoon kon niet worden opgeslagen." };
 
+  // Ook het overzicht: daar staat per klant de hoofdcontactpersoon.
+  revalidatePath("/klanten");
   revalidatePath(`/klanten/${parsed.data.company_id}`);
   return { success: "Contactpersoon toegevoegd." };
 }
@@ -167,5 +169,6 @@ export async function deleteContactAction(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("contacts").delete().eq("id", id);
 
+  revalidatePath("/klanten");
   revalidatePath(`/klanten/${companyId}`);
 }

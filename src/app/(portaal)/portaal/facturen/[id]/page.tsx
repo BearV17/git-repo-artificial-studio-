@@ -34,7 +34,7 @@ export default async function PortalInvoiceDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireClient();
+  const user = await requireClient();
   const { id } = await params;
   const supabase = await createClient();
 
@@ -42,6 +42,8 @@ export default async function PortalInvoiceDetailPage({
     .from("invoices")
     .select("*, project:projects(id, name)")
     .eq("id", id)
+    .eq("company_id", user.companyId)
+    .neq("status", "draft")
     .maybeSingle();
 
   if (!invoice) notFound();
@@ -51,6 +53,7 @@ export default async function PortalInvoiceDetailPage({
     .select("*")
     .eq("entity_type", "invoice")
     .eq("entity_id", id)
+    .eq("company_id", user.companyId)
     .order("created_at", { ascending: false });
 
   const project = Array.isArray(invoice.project) ? invoice.project[0] : invoice.project;

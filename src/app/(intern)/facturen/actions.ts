@@ -1,13 +1,19 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireManager } from "@/lib/auth";
 import { DOCUMENTS_BUCKET } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/server";
-import { firstIssue, optionalText, optionalUuid, text } from "@/lib/validation";
+import { revalidateShared } from "@/lib/revalidate";
+import {
+  firstIssue,
+  optionalText,
+  optionalUuid,
+  parseAmount,
+  text,
+} from "@/lib/validation";
 
 export interface InvoiceState {
   error?: string;
@@ -17,14 +23,10 @@ export interface InvoiceState {
 
 const INVOICE_STATUSES = ["draft", "open", "paid", "overdue", "credited"] as const;
 
-/** Bedragen komen binnen als "1.234,56" of "1234.56"; beide moeten werken. */
 const amount = z
   .string()
   .trim()
-  .transform((value) => {
-    const normalized = value.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
-    return normalized === "" ? 0 : Number(normalized);
-  })
+  .transform(parseAmount)
   .refine((value) => Number.isFinite(value) && value >= 0, {
     message: "Vul een geldig bedrag in.",
   });
@@ -81,8 +83,8 @@ export async function createInvoiceAction(
 
   if (error) return { error: "De factuur kon niet worden opgeslagen." };
 
-  revalidatePath("/facturen");
-  revalidatePath(`/klanten/${parsed.data.company_id}`);
+  revalidateShared("/facturen");
+  revalidateShared(`/klanten/${parsed.data.company_id}`);
   return { success: "Factuur aangemaakt.", id: data.id };
 }
 
@@ -103,9 +105,9 @@ export async function updateInvoiceAction(
 
   if (error) return { error: "De wijzigingen konden niet worden opgeslagen." };
 
-  revalidatePath("/facturen");
-  revalidatePath(`/facturen/${id}`);
-  revalidatePath(`/klanten/${parsed.data.company_id}`);
+  revalidateShared("/facturen");
+  revalidateShared(`/facturen/${id}`);
+  revalidateShared(`/klanten/${parsed.data.company_id}`);
   return { success: "Factuur bijgewerkt.", id };
 }
 
@@ -126,9 +128,9 @@ export async function setInvoiceStatusAction(invoiceId: string, status: string) 
 
   if (error || !data) return { error: "De factuur kon niet worden gewijzigd." };
 
-  revalidatePath("/facturen");
-  revalidatePath(`/facturen/${invoiceId}`);
-  revalidatePath(`/klanten/${data.company_id}`);
+  revalidateShared("/facturen");
+  revalidateShared(`/facturen/${invoiceId}`);
+  revalidateShared(`/klanten/${data.company_id}`);
   return { success: "Status bijgewerkt." };
 }
 
@@ -141,7 +143,7 @@ export async function deleteInvoiceAction(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("invoices").delete().eq("id", id);
 
-  revalidatePath("/facturen");
+  revalidateShared("/facturen");
   redirect("/facturen");
 }
 
@@ -198,7 +200,7 @@ export async function attachInvoicePdfAction(
 
   await supabase.from("invoices").update({ pdf_path: storagePath }).eq("id", invoiceId);
 
-  revalidatePath(`/facturen/${invoiceId}`);
-  revalidatePath("/documenten");
+  revalidateShared(`/facturen/${invoiceId}`);
+  revalidateShared("/documenten");
   return { success: "PDF toegevoegd." };
 }

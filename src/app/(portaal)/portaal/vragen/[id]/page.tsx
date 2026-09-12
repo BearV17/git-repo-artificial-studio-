@@ -38,6 +38,7 @@ export default async function PortalQuestionDetailPage({
     .from("customer_questions")
     .select("*, project:projects(id, name)")
     .eq("id", id)
+    .eq("company_id", user.companyId)
     .maybeSingle();
 
   if (!item) notFound();
@@ -49,6 +50,7 @@ export default async function PortalQuestionDetailPage({
     )
     .eq("entity_type", "question")
     .eq("entity_id", id)
+    .eq("company_id", user.companyId)
     .order("created_at");
 
   const project = Array.isArray(item.project) ? item.project[0] : item.project;

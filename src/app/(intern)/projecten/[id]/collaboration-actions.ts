@@ -1,10 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireInternal } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateShared } from "@/lib/revalidate";
 import {
   checkbox,
   firstIssue,
@@ -70,7 +70,7 @@ export async function createProjectUpdateAction(
     };
   }
 
-  revalidatePath(`/projecten/${parsed.data.project_id}`);
+  revalidateShared(`/projecten/${parsed.data.project_id}`);
   return {
     success: parsed.data.visible_to_client
       ? "Update gepubliceerd. De klant heeft een notificatie ontvangen."
@@ -88,7 +88,7 @@ export async function deleteProjectUpdateAction(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("project_updates").delete().eq("id", id);
 
-  revalidatePath(`/projecten/${projectId}`);
+  revalidateShared(`/projecten/${projectId}`);
 }
 
 /** Een bestaande update alsnog vrijgeven voor de klant, of juist intrekken. */
@@ -105,7 +105,7 @@ export async function toggleUpdateVisibilityAction(updateId: string, visible: bo
 
   if (error || !data) return { error: "De update kon niet worden gewijzigd." };
 
-  revalidatePath(`/projecten/${data.project_id}`);
+  revalidateShared(`/projecten/${data.project_id}`);
   return { success: visible ? "Zichtbaar voor de klant." : "Niet meer zichtbaar." };
 }
 
@@ -152,7 +152,7 @@ export async function createCustomerActionAction(
     return { error: "De actie kon niet worden aangemaakt. Mogelijk beheer je dit project niet." };
   }
 
-  revalidatePath(`/projecten/${parsed.data.project_id}`);
+  revalidateShared(`/projecten/${parsed.data.project_id}`);
   return { success: "Actie bij de klant neergelegd." };
 }
 
@@ -173,7 +173,7 @@ export async function setCustomerActionStatusAction(actionId: string, status: st
 
   if (error || !data) return { error: "De actie kon niet worden gewijzigd." };
 
-  revalidatePath(`/projecten/${data.project_id}`);
+  revalidateShared(`/projecten/${data.project_id}`);
   return { success: "Status bijgewerkt." };
 }
 
@@ -187,7 +187,7 @@ export async function deleteCustomerActionAction(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("customer_actions").delete().eq("id", id);
 
-  revalidatePath(`/projecten/${projectId}`);
+  revalidateShared(`/projecten/${projectId}`);
 }
 
 // -----------------------------------------------------------------------------
@@ -225,7 +225,7 @@ export async function createNoteAction(
 
   if (error) return { error: "De notitie kon niet worden opgeslagen." };
 
-  revalidatePath(`/projecten/${parsed.data.project_id}`);
+  revalidateShared(`/projecten/${parsed.data.project_id}`);
   return { success: "Notitie opgeslagen." };
 }
 
@@ -239,5 +239,5 @@ export async function deleteNoteAction(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("notes").delete().eq("id", id);
 
-  revalidatePath(`/projecten/${projectId}`);
+  revalidateShared(`/projecten/${projectId}`);
 }

@@ -42,6 +42,7 @@ export default async function PortalActionDetailPage({
     .from("customer_actions")
     .select("*, project:projects(id, name)")
     .eq("id", id)
+    .eq("company_id", user.companyId)
     .maybeSingle();
 
   if (!action) notFound();
@@ -60,6 +61,7 @@ export default async function PortalActionDetailPage({
       .select("*")
       .eq("entity_type", "customer_action")
       .eq("entity_id", id)
+      .eq("company_id", user.companyId)
       .order("created_at", { ascending: false }),
   ]);
 

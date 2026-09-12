@@ -11,12 +11,11 @@ import {
   UserRoundCheck,
   type LucideIcon,
 } from "lucide-react";
-import Link from "next/link";
-
 import {
   deleteNotificationAction,
   markNotificationReadAction,
 } from "@/lib/actions/notifications";
+import { NotificationLink } from "./notification-link";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/misc";
 import { cn, formatDateTime, formatRelative } from "@/lib/utils";
@@ -121,12 +120,14 @@ export function NotificationList({
             )}
           >
             {notification.link ? (
-              <Link
+              <NotificationLink
+                id={notification.id}
                 href={notification.link}
+                isRead={notification.is_read}
                 className="flex min-w-0 flex-1 items-center gap-3"
               >
                 {content}
-              </Link>
+              </NotificationLink>
             ) : (
               <span className="flex min-w-0 flex-1 items-center gap-3">{content}</span>
             )}

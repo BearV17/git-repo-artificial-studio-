@@ -1,10 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateShared } from "@/lib/revalidate";
 import { checkbox, firstIssue, text } from "@/lib/validation";
 import type { EntityType } from "@/lib/types";
 
@@ -105,10 +105,12 @@ function revalidateFor(
   const paths: Record<string, string> = {
     feedback: `/feedback/${entityId}`,
     question: `/vragen/${entityId}`,
+    customer_action: `/acties/${entityId}`,
   };
 
-  const path = paths[entityType];
-  if (path) revalidatePath(path);
-  if (projectId) revalidatePath(`/projecten/${projectId}`);
-  revalidatePath("/notificaties");
+  revalidateShared(
+    paths[entityType],
+    projectId ? `/projecten/${projectId}` : null,
+    "/notificaties",
+  );
 }

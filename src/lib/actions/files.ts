@@ -112,9 +112,7 @@ export async function registerFileAction(
     return { error: "Het document kon niet worden opgeslagen." };
   }
 
-  revalidatePath("/documenten");
-  if (parsed.data.project_id) revalidatePath(`/projecten/${parsed.data.project_id}`);
-  revalidatePath(`/klanten/${parsed.data.company_id}`);
+  revalidateDocumentPaths(parsed.data);
   return { success: "Document toegevoegd." };
 }
 
@@ -128,7 +126,7 @@ export async function deleteFileAction(formData: FormData) {
 
   const { data: file } = await supabase
     .from("files")
-    .select("storage_path, project_id, company_id")
+    .select("storage_path, project_id, company_id, entity_type, entity_id")
     .eq("id", id)
     .maybeSingle();
 
@@ -141,9 +139,50 @@ export async function deleteFileAction(formData: FormData) {
     await supabase.storage.from(DOCUMENTS_BUCKET).remove([file.storage_path]);
   }
 
+  revalidateDocumentPaths(file ?? {});
+}
+
+/**
+ * Routes per onderwerp waaraan een bestand kan hangen. Zonder deze koppeling
+ * blijft de bijlage na verwijderen gewoon staan op bijvoorbeeld de
+ * feedbackpagina: de actie slaagt, maar de pagina komt uit de cache.
+ */
+const ENTITY_ROUTES: Record<string, [string] | [string, string]> = {
+  feedback: ["/feedback", "/portaal/feedback"],
+  question: ["/vragen", "/portaal/vragen"],
+  customer_action: ["/acties", "/portaal/acties"],
+  invoice: ["/facturen", "/portaal/facturen"],
+  project: ["/projecten", "/portaal/projecten"],
+  project_update: ["/projecten"],
+  task: ["/projecten"],
+  company: ["/klanten"],
+};
+
+/**
+ * Dezelfde handeling raakt twee omgevingen: een klant die een bestand aanlevert
+ * of verwijdert moet dat meteen terugzien in het portaal, en het team in het
+ * interne overzicht. Beide kanten worden daarom altijd ververst.
+ */
+function revalidateDocumentPaths(file: {
+  project_id?: string | null;
+  company_id?: string | null;
+  entity_type?: string | null;
+  entity_id?: string | null;
+}) {
   revalidatePath("/documenten");
-  if (file?.project_id) revalidatePath(`/projecten/${file.project_id}`);
-  if (file?.company_id) revalidatePath(`/klanten/${file.company_id}`);
+  revalidatePath("/portaal/documenten");
+  revalidatePath("/portaal");
+
+  if (file.project_id) {
+    revalidatePath(`/projecten/${file.project_id}`);
+    revalidatePath(`/portaal/projecten/${file.project_id}`);
+  }
+  if (file.company_id) revalidatePath(`/klanten/${file.company_id}`);
+
+  const routes = file.entity_type ? ENTITY_ROUTES[file.entity_type] : undefined;
+  if (routes && file.entity_id) {
+    for (const base of routes) revalidatePath(`${base}/${file.entity_id}`);
+  }
 }
 
 /**

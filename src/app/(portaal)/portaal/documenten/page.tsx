@@ -8,6 +8,7 @@ import { requireClient } from "@/lib/auth";
 import { DOCUMENT_CATEGORY } from "@/lib/labels";
 import { createClient } from "@/lib/supabase/server";
 import type { DocumentCategory } from "@/lib/types";
+import { daysAgoIso } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Documenten" };
 
@@ -25,9 +26,22 @@ export default async function PortalDocumentsPage() {
     supabase
       .from("files")
       .select("*, project:projects(name)")
+      // Naast RLS ook hier expliciet: alleen de eigen organisatie, en alleen
+      // wat bewust met de klant gedeeld is.
+      .eq("company_id", user.companyId)
+      .eq("visible_to_client", true)
       .order("created_at", { ascending: false }),
-    supabase.from("projects").select("id, name, company_id").order("name"),
+    supabase
+      .from("projects")
+      .select("id, name, company_id")
+      .eq("company_id", user.companyId)
+      .order("name"),
   ]);
+
+  // Alles van de afgelopen week krijgt een "Nieuw"-label en staat bovendien
+  // bovenaan in een aparte kaart, zodat een net aangeleverd bestand meteen
+  // zichtbaar is en niet ergens tussen de categorieën verdwijnt.
+  const newSince = daysAgoIso(7);
 
   const documents: DocumentRow[] = (fileRows ?? []).map((row) => {
     const project = Array.isArray(row.project) ? row.project[0] : row.project;
@@ -50,6 +64,8 @@ export default async function PortalDocumentsPage() {
       items: documents.filter((doc) => doc.category === category.value),
     }))
     .filter((category) => category.items.length > 0);
+
+  const recent = documents.filter((doc) => doc.created_at > newSince).slice(0, 8);
 
   return (
     <>
@@ -77,11 +93,28 @@ export default async function PortalDocumentsPage() {
         }
       />
 
+      {recent.length > 0 ? (
+        <Card>
+          <CardHeader
+            title="Onlangs toegevoegd"
+            description="De nieuwste bestanden van de afgelopen week."
+          />
+          <DocumentList
+            documents={recent}
+            currentUserId={user.id}
+            newSince={newSince}
+            showProject
+            showVisibility={false}
+          />
+        </Card>
+      ) : null}
+
       {categories.length === 0 ? (
         <Card>
           <DocumentList
             documents={[]}
             showVisibility={false}
+            currentUserId={user.id}
             emptyTitle="Nog geen documenten"
             emptyDescription="Zodra wij documenten met u delen, verschijnen ze hier."
           />
@@ -99,6 +132,8 @@ export default async function PortalDocumentsPage() {
             />
             <DocumentList
               documents={category.items}
+              currentUserId={user.id}
+              newSince={newSince}
               showProject
               showVisibility={false}
             />

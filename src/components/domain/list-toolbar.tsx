@@ -108,7 +108,12 @@ export function ListToolbar({
           size="sm"
           onClick={() => {
             setQuery("");
-            startTransition(() => router.replace(pathname, { scroll: false }));
+            // Alleen de zoekopdracht en de filters wissen. Andere parameters,
+            // zoals de gekozen weergave (lijst/bord), horen te blijven staan.
+            pushParams((params) => {
+              params.delete("q");
+              for (const filter of filters) params.delete(filter.name);
+            });
           }}
         >
           <X className="h-3.5 w-3.5" />
